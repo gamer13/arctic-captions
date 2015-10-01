@@ -14,12 +14,11 @@ class HomogeneousData():
 
     def prepare(self):
         self.caps = self.data[0]
-        self.feats = self.data[1]
 
         # find the unique lengths
         self.lengths = [len(cc[0].split()) for cc in self.caps]
         self.len_unique = numpy.unique(self.lengths)
-        # remove any overly long captions
+        # remove any overly long captions, if need be
         if self.maxlen:
             self.len_unique = [ll for ll in self.len_unique if ll <= self.maxlen]
 
