@@ -35,6 +35,8 @@ import flickr8k
 import flickr30k
 import coco
 
+from IPython import embed
+
 
 # datasets: 'name', 'load_data: returns iterator', 'prepare_data: some preprocessing'
 datasets = {'flickr8k': (flickr8k.load_data, flickr8k.prepare_data),
@@ -1215,8 +1217,9 @@ def train(dim_word=100,  # word vector dimensionality
     print 'Optimization'
 
     # [See note in section 4.3 of paper]
-    train_iter = HomogeneousData(train, batch_size=batch_size, maxlen=maxlen)
+    train_iter = HomogeneousData(train, batch_size=batch_size, maxlen=maxlen) # Iterator for captions
 
+    # K-fold for valid and test set
     if valid:
         kf_valid = KFold(len(valid[0]), n_folds=len(valid[0])/valid_batch_size, shuffle=False)
     if test:
@@ -1253,9 +1256,9 @@ def train(dim_word=100,  # word vector dimensionality
             # preprocess the caption, recording the
             # time spent to help detect bottlenecks
             pd_start = time.time()
-            x, mask, ctx = prepare_data(caps,
-                                        train[1],
-                                        worddict,
+            x, mask, ctx = prepare_data(caps,     # Captions of this batch
+                                        train[1], # Pass in visual features
+                                        worddict, # Word dictionary
                                         maxlen=maxlen,
                                         n_words=n_words)
             pd_duration = time.time() - pd_start
