@@ -35,6 +35,9 @@ import flickr8k
 import flickr30k
 import coco
 
+# Status monitor
+from monitor import Monitor
+
 
 # datasets: 'name', 'load_data: returns iterator', 'prepare_data: some preprocessing'
 datasets = {'flickr8k': (flickr8k.load_data, flickr8k.prepare_data),
@@ -1091,6 +1094,7 @@ def train(dim_word=100,  # word vector dimensionality
           batch_size = 16,
           valid_batch_size = 16,
           saveto='model.npz',  # relative path of saved model file
+          out_dir='',
           validFreq=1000,
           saveFreq=1000,  # save the parameters after every saveFreq updates
           sampleFreq=100,  # generate some samples after every sampleFreq updates
@@ -1099,22 +1103,26 @@ def train(dim_word=100,  # word vector dimensionality
           use_dropout=False,  # setting this true turns on dropout at various points
           use_dropout_lstm=False,  # dropout on lstm gates
           reload_=False,
-          save_per_epoch=False): # this saves down the model every epoch
+          save_per_epoch=False, # this saves down the model every epoch
+          monitor=None):
 
     # hyperparam dict
     model_options = locals().copy()
     model_options = validate_options(model_options)
 
     # reload options
-    if reload_ and os.path.exists(saveto):
+    if reload_ and os.path.exists('{}/{}'.format(out_dir, saveto)):
         print "Reloading options"
-        with open('%s.pkl'%saveto, 'rb') as f:
+        with open('{}/{}.pkl'.format(out_dir, saveto), 'rb') as f:
             model_options = pkl.load(f)
 
     print "Using the following parameters:"
     print  model_options
 
     print 'Loading data'
+    # ----------------
+    monitor.status = 2
+    # ----------------
     load_data, prepare_data = get_dataset(dataset)
     train, valid, test, worddict = load_data()
 
@@ -1128,10 +1136,16 @@ def train(dim_word=100,  # word vector dimensionality
     # Initialize (or reload) the parameters using 'model_options'
     # then build the Theano graph
     print 'Building model'
+    # ----------------
+    monitor.status = 3
+    # ----------------
     params = init_params(model_options)
-    if reload_ and os.path.exists(saveto):
+    if reload_ and os.path.exists('{}/{}'.format(out_dir, saveto)):
         print "Reloading model"
-        params = load_params(saveto, params)
+        # ----------------
+        monitor.status = 1
+        # ----------------
+        params = load_params('{}/{}'.format(out_dir, saveto), params)
 
     # numpy arrays -> theano shared variables
     tparams = init_tparams(params)
@@ -1153,6 +1167,9 @@ def train(dim_word=100,  # word vector dimensionality
     # the LSTM at time 0 [see top right of page 4], 2) f_next returns the distribution over
     # words and also the new "initial state/memory" see equation
     print 'Buliding sampler'
+    # ----------------
+    monitor.status = 4
+    # ----------------
     f_init, f_next = build_sampler(tparams, model_options, use_noise, trng)
 
     # we want the cost without any the regularizers
@@ -1190,14 +1207,14 @@ def train(dim_word=100,  # word vector dimensionality
         # [see Section 4.1: Stochastic "Hard" Attention for derivation of this learning rule]
         if model_options['RL_sumCost']:
             grads = tensor.grad(cost, wrt=itemlist(tparams),
-                                disconnected_inputs='raise',
-                                known_grads={alphas:(baseline_time-opt_outs['masked_cost'].mean(0))[None,:,None]/10.*
-                                            (-alphas_sample/alphas) + alpha_entropy_c*(tensor.log(alphas) + 1)})
+                            disconnected_inputs='raise',
+                            known_grads={alphas:(baseline_time-opt_outs['masked_cost'].mean(0))[None,:,None]/10.*
+                                        (-alphas_sample/alphas) + alpha_entropy_c*(tensor.log(alphas) + 1)})
         else:
             grads = tensor.grad(cost, wrt=itemlist(tparams),
                             disconnected_inputs='raise',
                             known_grads={alphas:opt_outs['masked_cost'][:,:,None]/10.*
-                            (alphas_sample/alphas) + alpha_entropy_c*(tensor.log(alphas) + 1)})
+                                        (alphas_sample/alphas) + alpha_entropy_c*(tensor.log(alphas) + 1)})
         # [equation on bottom left of page 5]
         hard_attn_updates += [(baseline_time, baseline_time * 0.9 + 0.1 * opt_outs['masked_cost'].mean())]
         # updates from scan
@@ -1213,6 +1230,9 @@ def train(dim_word=100,  # word vector dimensionality
     f_grad_shared, f_update = eval(optimizer)(lr, tparams, grads, inps, cost, hard_attn_updates)
 
     print 'Optimization'
+    # ----------------
+    monitor.status = 5
+    # ----------------
 
     # [See note in section 4.3 of paper]
     train_iter = HomogeneousData(train, batch_size=batch_size, maxlen=maxlen)
@@ -1225,8 +1245,8 @@ def train(dim_word=100,  # word vector dimensionality
     # history_errs is a bare-bones training log that holds the validation and test error
     history_errs = []
     # reload history
-    if reload_ and os.path.exists(saveto):
-        history_errs = numpy.load(saveto)['history_errs'].tolist()
+    if reload_ and os.path.exists('{}/{}'.format(out_dir, saveto)):
+        history_errs = numpy.load('{}/{}'.format(out_dir, saveto))['history_errs'].tolist()
     best_p = None
     bad_counter = 0
 
@@ -1243,8 +1263,16 @@ def train(dim_word=100,  # word vector dimensionality
         n_samples = 0
 
         print 'Epoch ', eidx
+        # ------------------
+        monitor.epoch = eidx
+        # ------------------
 
         for caps in train_iter:
+            # ----------------
+            monitor.status = 6
+            monitor.update = uidx
+            # ----------------
+
             n_samples += len(caps)
             uidx += 1
             # turn on dropout
@@ -1272,58 +1300,88 @@ def train(dim_word=100,  # word vector dimensionality
 
             # Numerical stability check
             if numpy.isnan(cost) or numpy.isinf(cost):
+                # ----------------
+                monitor.status = 7
+                # ----------------
                 print 'NaN detected'
                 return 1., 1., 1.
 
             if numpy.mod(uidx, dispFreq) == 0:
                 print 'Epoch ', eidx, 'Update ', uidx, 'Cost ', cost, 'PD ', pd_duration, 'UD ', ud_duration
+                # -----------------
+                monitor.cost = float(cost)
+                # -----------------
 
             # Checkpoint
             if numpy.mod(uidx, saveFreq) == 0:
                 print 'Saving...',
+                # ----------------
+                monitor.status = 8
+                # ----------------
 
                 if best_p is not None:
                     params = copy.copy(best_p)
                 else:
                     params = unzip(tparams)
-                numpy.savez(saveto, history_errs=history_errs, **params)
-                pkl.dump(model_options, open('%s.pkl'%saveto, 'wb'))
+                numpy.savez('{}/{}'.format(out_dir, saveto), history_errs=history_errs, **params)
+                pkl.dump(model_options, open('{}/{}.pkl'.format(out_dir, saveto), 'wb'))
                 print 'Done'
 
             # Print a generated sample as a sanity check
             if numpy.mod(uidx, sampleFreq) == 0:
+                # ----------------
+                monitor.status = 9
+                # ----------------
                 # turn off dropout first
                 use_noise.set_value(0.)
                 x_s = x
                 mask_s = mask
                 ctx_s = ctx
                 # generate and decode the a subset of the current training batch
+                truths = []
+                samples = []
                 for jj in xrange(numpy.minimum(10, len(caps))):
                     sample, score = gen_sample(tparams, f_init, f_next, ctx_s[jj], model_options,
                                                trng=trng, k=5, maxlen=30, stochastic=False)
                     # Decode the sample from encoding back to words
                     print 'Truth ',jj,': ',
+                    truth = []
                     for vv in x_s[:,jj]:
                         if vv == 0:
                             break
                         if vv in word_idict:
-                            print word_idict[vv],
+                            truth.append(word_idict[vv])
                         else:
-                            print 'UNK',
+                            truth.append('UNK')
+                    truth = ' '.join(truth)
+                    truths.append(truth)
+                    print truth
                     print
+
                     for kk, ss in enumerate([sample[0]]):
                         print 'Sample (', kk,') ', jj, ': ',
+                        sample = []
                         for vv in ss:
                             if vv == 0:
                                 break
                             if vv in word_idict:
-                                print word_idict[vv],
+                                sample.append(word_idict[vv])
                             else:
-                                print 'UNK',
+                                sample.append('UNK')
+                        sample = ' '.join(sample)
+                        samples.append(sample)
+                        print sample
                     print
+                # -----------------------
+                monitor.truths  = truths
+                monitor.samples = samples
+                # -----------------------
 
             # Log validation loss + checkpoint the model with the best validation log likelihood
             if numpy.mod(uidx, validFreq) == 0:
+                # -----------------
+                monitor.status = 10
+                # -----------------
                 use_noise.set_value(0.)
                 train_err = 0
                 valid_err = 0
@@ -1334,7 +1392,7 @@ def train(dim_word=100,  # word vector dimensionality
                 if test:
                     test_err = -pred_probs(f_log_probs, model_options, worddict, prepare_data, test, kf_test).mean()
 
-                history_errs.append([valid_err, test_err])
+                history_errs.append([float(valid_err), float(test_err)])
 
                 # the model with the best validation long likelihood is saved seperately with a different name
                 if uidx == 0 or valid_err <= numpy.array(history_errs)[:,0].min():
@@ -1342,7 +1400,7 @@ def train(dim_word=100,  # word vector dimensionality
                     print 'Saving model with best validation ll'
                     params = copy.copy(best_p)
                     params = unzip(tparams)
-                    numpy.savez(saveto+'_bestll', history_errs=history_errs, **params)
+                    numpy.savez('{}/{}_bestll'.format(out_dir, saveto), history_errs=history_errs, **params)
                     bad_counter = 0
 
                 # abort training if perplexity has been increasing for too long
@@ -1354,6 +1412,9 @@ def train(dim_word=100,  # word vector dimensionality
                         break
 
                 print 'Train ', train_err, 'Valid ', valid_err, 'Test ', test_err
+                # -----------------------------
+                monitor.history_errors = history_errs
+                # -----------------------------
 
         print 'Seen %d samples' % n_samples
 
@@ -1361,7 +1422,7 @@ def train(dim_word=100,  # word vector dimensionality
             break
 
         if save_per_epoch:
-            numpy.savez(saveto + '_epoch_' + str(eidx + 1), history_errs=history_errs, **unzip(tparams))
+            numpy.savez('{}/{}_epoch_{}'.format(out_dir, saveto, str(eidx + 1)), history_errs=history_errs, **unzip(tparams))
 
     # use the best nll parameters for final checkpoint (if they exist)
     if best_p is not None:
@@ -1379,9 +1440,14 @@ def train(dim_word=100,  # word vector dimensionality
     print 'Train ', train_err, 'Valid ', valid_err, 'Test ', test_err
 
     params = copy.copy(best_p)
-    numpy.savez(saveto, zipped_params=best_p, train_err=train_err,
+    numpy.savez('{}/{}'.format(out_dir, saveto), zipped_params=best_p, train_err=train_err,
                 valid_err=valid_err, test_err=test_err, history_errs=history_errs,
                 **params)
+
+    # -----------------
+    monitor.status = 11
+    monitor.history_errors = history_errs
+    # -----------------
 
     return train_err, valid_err, test_err
 
