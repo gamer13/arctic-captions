@@ -1,4 +1,5 @@
 import json
+import time
 from collections import deque
 
 class Monitor(object):
@@ -23,6 +24,7 @@ class Monitor(object):
     def __init__(self, monitor_file):
         self.monitor_file = monitor_file
         self.window_size  = 1000
+        self.time_created = time.time()
         self._status      = 0
         self._epoch       = 0
         self._update      = 0
@@ -108,12 +110,14 @@ class Monitor(object):
         self.save()
 
     def save(self):
-	if 'monitor' in self.options.keys():
-		# Remove itself from the options
-		del self.options['monitor']
+        if 'monitor' in self.options.keys():
+            # Remove itself from the options
+            del self.options['monitor']
 
         # Save data
         data = {
+            'time_created'  : self.time_created,
+            'time_modified' : time.time(),
             'status'        : self._status,
             'epoch'         : self._epoch,
             'costs'         : list(self._cost),
