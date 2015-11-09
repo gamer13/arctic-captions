@@ -6,6 +6,7 @@ Works on CPU with support for multi-process
 import argparse
 import numpy
 import cPickle as pkl
+import json
 from progress.bar import Bar
 
 from capgen import build_sampler, gen_sample, \
@@ -30,7 +31,7 @@ def create_sample(tparams, f_init, f_next, context, options, trng, k, normalize)
     sidx = numpy.argmin(score)
     return sample[sidx]
 
-def main(model, saveto, k=1, normalize=False, zero_pad=False, n_process=5, datasets='dev,test', sampling=False, pkl_name=None):
+def main(model, saveto, k=1, normalize=False, zero_pad=False, datasets='dev,test', sampling=False, pkl_name=None):
     # load model model_options
     if pkl_name is None:
         pkl_name = model
@@ -93,16 +94,25 @@ def main(model, saveto, k=1, normalize=False, zero_pad=False, n_process=5, datas
                 sample = _send_job(valid[1][i])
                 cap = _seqs2words(sample)
                 caps.append(cap)
+                with open(saveto+'_status.json', 'w') as f:
+                    json.dump({'current': i, 'total': len(valid[1])}, f)
                 bar.next()
             bar.finish()
-            with open(saveto+'.dev.txt', 'w') as f:
+            with open(saveto, 'w') as f:
                 print >>f, '\n'.join(caps)
             print 'Done'
         if dd == 'test':
             print 'Test Set...',
-            _send_jobs(test[1])
-            caps = _seqs2words(_retrieve_jobs(len(test[1])))
-            with open(saveto+'.test.txt', 'w') as f:
+            caps = []
+            for i in range(len(test[1])):
+                sample = _send_job(test[1][i])
+                cap = _seqs2words(sample)
+                caps.append(cap)
+                with open(saveto+'_status.json', 'w') as f:
+                    json.dump({'current': i, 'total': len(test[1])}, f)
+                bar.next()
+            bar.finish()
+            with open(saveto, 'w') as f:
                 print >>f, '\n'.join(caps)
             print 'Done'
 
@@ -111,13 +121,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-k', type=int, default=1)
     parser.add_argument('-sampling', action="store_true", default=False) # this only matters for hard attention
-    parser.add_argument('-p', type=int, default=1, help="number of processes to use")
     parser.add_argument('-n', action="store_true", default=False)
     parser.add_argument('-z', action="store_true", default=False)
-    parser.add_argument('-d', type=str, default='dev,test')
+    parser.add_argument('-d', type=str, default='devt')
     parser.add_argument('-pkl_name', type=str, default=None, help="name of pickle file (without the .pkl)")
     parser.add_argument('model', type=str)
     parser.add_argument('saveto', type=str)
 
     args = parser.parse_args()
-    main(args.model, args.saveto, k=args.k, zero_pad=args.z, pkl_name=args.pkl_name,  n_process=args.p, normalize=args.n, datasets=args.d, sampling=args.sampling)
+    main(args.model, args.saveto, k=args.k, zero_pad=args.z, pkl_name=args.pkl_name, normalize=args.n, datasets=args.d, sampling=args.sampling)
