@@ -492,16 +492,16 @@ def lstm_cond_layer(tparams, state_below, options, prefix='lstm',
                 rval = _step0(mask, state_below, init_state, init_memory, None, None, None, pctx_)
         return rval
     else:
-        seqs = [mask, state_below]
+        seqs = [mask, state_below]                                      # m, x
         if options['use_dropout_lstm']:
-            seqs += [dp_mask]
-        outputs_info = [init_state,
-                        init_memory,
-                        tensor.alloc(0., n_samples, pctx_.shape[1]),
-                        tensor.alloc(0., n_samples, pctx_.shape[1]),
-                        tensor.alloc(0., n_samples, context.shape[2])]
+            seqs += [dp_mask]                                           # dp
+        outputs_info = [init_state,                                     # h
+                        init_memory,                                    # c
+                        tensor.alloc(0., n_samples, pctx_.shape[1]),    # a
+                        tensor.alloc(0., n_samples, pctx_.shape[1]),    # as
+                        tensor.alloc(0., n_samples, context.shape[2])]  # ct
         if options['selector']:
-            outputs_info += [tensor.alloc(0., n_samples)]
+            outputs_info += [tensor.alloc(0., n_samples)]               # sel
         outputs_info += [None,
                          None,
                          None,
@@ -512,7 +512,7 @@ def lstm_cond_layer(tparams, state_below, options, prefix='lstm',
         rval, updates = theano.scan(_step0,
                                     sequences=seqs,
                                     outputs_info=outputs_info,
-                                    non_sequences=[pctx_],
+                                    non_sequences=[pctx_],              # pctx
                                     name=_p(prefix, '_layers'),
                                     n_steps=nsteps, profile=False)
         return rval, updates
