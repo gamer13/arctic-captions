@@ -1,12 +1,13 @@
 import json
 import nltk
 import numpy as np
+import argparse
 from progress.bar import Bar
 
 from IPython import embed
 
-def main():
-	d = json.load(open('captions_val2014.json', 'r'))
+def main(args):
+	d = json.load(open(args.c, 'r'))
 
 	np.random.seed(1234)
 
@@ -28,15 +29,21 @@ def main():
 		bar.next()
 	bar.finish()
 
-	with open('splits/coco_val.txt', 'r') as f:
+	with open(args.s, 'r') as f:
 		images = f.read().split()
 
 	refs = []
 	for im in images:
 		refs.append('<>'.join(id2cap[im2id[im]]))
 
-	with open('first_run.references.txt', 'w') as f:
+	with open(args.saveto, 'w') as f:
 		print >>f, '\n'.join(refs)
 
 if __name__ == '__main__':
-	main()
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-c', help='Validation captions file', type=str)
+	parser.add_argument('-s', help='Validation split file', type=str)
+	parser.add_argument('saveto', help='Output file', type=str)
+	args = parser.parse_args()
+
+	main(args)
