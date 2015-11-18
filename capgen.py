@@ -502,13 +502,13 @@ def lstm_cond_layer(tparams, state_below, options, prefix='lstm',
                         tensor.alloc(0., n_samples, context.shape[2])]  # ct
         if options['selector']:
             outputs_info += [tensor.alloc(0., n_samples)]               # sel
-        outputs_info += [None,
-                         None,
-                         None,
-                         None,
-                         None,
-                         None,
-                         None] + [None] # *options['n_layers_att']
+        outputs_info += [None,                                          # pstate
+                         None,                                          # pctx
+                         None,                                          # i
+                         None,                                          # f
+                         None,                                          # o
+                         None,                                          # preact
+                         None] + [None] # *options['n_layers_att']      # alpha_pre + pctx_list
         rval, updates = theano.scan(_step0,
                                     sequences=seqs,
                                     outputs_info=outputs_info,

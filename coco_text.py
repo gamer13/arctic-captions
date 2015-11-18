@@ -67,7 +67,7 @@ def prepare_data(caps, features, contexts, worddict, maxlen=None, n_words=10000,
 
     return x, x_mask, y, c
 
-def load_data(load_train=True, load_dev=True, load_test=True, path='/media/Data/flipvanrijn/datasets/coco/processed/reduced/'):
+def load_data(load_train=True, load_dev=True, load_test=True, path='/media/Data_/flipvanrijn/datasets/coco/processed/reduced/'):
     ''' Loads the dataset
 
     :type dataset: string
@@ -80,22 +80,22 @@ def load_data(load_train=True, load_dev=True, load_test=True, path='/media/Data/
 
     print '... loading data'
 
+    train = None
+    test  = None
+    valid = None
+
     if load_train:
         with open(path+'coco_align.train.pkl', 'rb') as f:
             train_cap  = pkl.load(f)
             train_feat = pkl.load(f)
             train_ctx  = pkl.load(f)
         train = (train_cap, train_feat, train_ctx)
-    else:
-        train = None
     if load_test:
         with open(path+'coco_align.test.pkl', 'rb') as f:
             test_cap  = pkl.load(f)
             test_feat = pkl.load(f)
             test_ctx  = pkl.load(f)
         test = (test_cap, test_feat, test_ctx)
-    else:
-        test = None
     if load_dev:
         with open(path+'coco_align.dev.pkl', 'rb') as f:
             dev_cap  = pkl.load(f)

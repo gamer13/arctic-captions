@@ -921,7 +921,9 @@ def build_sampler(tparams, options, use_noise, trng, sampling=True):
     next_sample = trng.multinomial(pvals=next_probs).argmax(1)
 
     # next word probability
+    print 'Building f_next...'
     f_next = theano.function([x, ctx, tex]+init_state+init_memory, [next_probs, next_sample]+next_state+next_memory, name='f_next', profile=False)
+    print 'Done'
 
     return f_init, f_next
 
@@ -1039,7 +1041,7 @@ def gen_sample(tparams, f_init, f_next, ctx0, tex0, options, trng=None, k=1, max
             # get the corresponding hypothesis and append the predicted word
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
                 new_hyp_samples.append(hyp_samples[ti]+[wi])
-                new_hyp_scores[idx] = copy.copy(costs[ti]) # copy in the cost of that hypothesis 
+                new_hyp_scores[idx] = copy.copy(costs[idx]) # copy in the cost of that hypothesis 
                 for lidx in xrange(options['n_layers_lstm']):
                     new_hyp_states[lidx].append(copy.copy(next_state[lidx][ti]))
                 for lidx in xrange(options['n_layers_lstm']):
@@ -1195,6 +1197,7 @@ def train(dim_word=100,  # word vector dimensionality
           valid_batch_size = 16,
           saveto='model.npz',  # relative path of saved model file
           out_dir='',
+          data_dir='',
           validFreq=1000,
           saveFreq=1000,  # save the parameters after every saveFreq updates
           sampleFreq=100,  # generate some samples after every sampleFreq updates
@@ -1224,7 +1227,7 @@ def train(dim_word=100,  # word vector dimensionality
     monitor.status = 2
     # ----------------
     load_data, prepare_data = get_dataset(dataset)
-    train, valid, test, worddict = load_data()
+    train, valid, test, worddict = load_data(path=data_dir)
 
     # index 0 and 1 always code for the end of sentence and unknown token
     word_idict = dict()
@@ -1524,6 +1527,7 @@ def train(dim_word=100,  # word vector dimensionality
             print 'Seen %d samples' % n_samples
 
             if estop:
+                monitor.estop = True
                 break
 
             if save_per_epoch:
