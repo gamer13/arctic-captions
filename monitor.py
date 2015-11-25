@@ -120,6 +120,7 @@ class Monitor(object):
             'time_modified' : time.time(),
             'status'        : self._status,
             'epoch'         : self._epoch,
+            'update'        : self._update,
             'costs'         : list(self._cost),
             'options'       : self.options,
             'dictionary'    : self.dictionary,
