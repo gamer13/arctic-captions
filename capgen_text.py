@@ -1270,7 +1270,7 @@ def train(dim_word=100,  # word vector dimensionality
     # To sample, we use beam search: 1) f_init is a function that initializes
     # the LSTM at time 0 [see top right of page 4], 2) f_next returns the distribution over
     # words and also the new "initial state/memory" see equation
-    print 'Buliding sampler'
+    print 'Building sampler'
     # ----------------
     monitor.status = 4
     # ----------------
@@ -1387,7 +1387,7 @@ def train(dim_word=100,  # word vector dimensionality
                 # preprocess the caption, recording the
                 # time spent to help detect bottlenecks
                 pd_start = time.time()
-                x, mask, ctx, tex = prepare_data(caps,     # Captions of this batch
+                x, mask, ctx, tex, raw = prepare_data(caps,     # Captions of this batch
                                             train[1], # Pass in visual features
                                             train[2],
                                             worddict, # Word dictionary

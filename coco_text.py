@@ -7,7 +7,7 @@ import time
 import numpy
 
 
-def prepare_data(caps, features, contexts, worddict, maxlen=None, n_words=10000, zero_pad=False):
+def prepare_data(caps, features, contexts, raws, worddict, maxlen=None, n_words=10000, zero_pad=False):
     # x: a list of sentences
     seqs = []
     feat_list = []
@@ -38,6 +38,7 @@ def prepare_data(caps, features, contexts, worddict, maxlen=None, n_words=10000,
         if len(lengths) < 1:
             return None, None, None, None
 
+    # img feats
     y = numpy.zeros((len(feat_list), feat_list[0].shape[1])).astype('float32')
     for idx, ff in enumerate(feat_list):
         y[idx,:] = numpy.array(ff.todense())
@@ -47,6 +48,7 @@ def prepare_data(caps, features, contexts, worddict, maxlen=None, n_words=10000,
         y_pad[:,:-1,:] = y
         y = y_pad
 
+    # context feats
     c = numpy.zeros((len(context_list), context_list[0].shape[1])).astype('float32')
     for idx, cc in enumerate(context_list):
         c[idx,:] = numpy.array(cc.todense())
@@ -55,6 +57,10 @@ def prepare_data(caps, features, contexts, worddict, maxlen=None, n_words=10000,
         c_pad = numpy.zeros((c.shape[0], c.shape[1]+1, c.shape[2])).astype('float32')
         c_pad[:,:-1,:] = c
         c = c_pad
+
+    # raw context
+    r = []
+
 
     n_samples = len(seqs)
     maxlen = numpy.max(lengths)+1
@@ -67,7 +73,7 @@ def prepare_data(caps, features, contexts, worddict, maxlen=None, n_words=10000,
 
     return x, x_mask, y, c
 
-def load_data(load_train=True, load_dev=True, load_test=True, path='/media/Data_/flipvanrijn/datasets/coco/processed/reduced/'):
+def load_data(load_train=True, load_dev=True, load_test=True, path='./'):
     ''' Loads the dataset
 
     :type dataset: string
@@ -89,19 +95,22 @@ def load_data(load_train=True, load_dev=True, load_test=True, path='/media/Data_
             train_cap  = pkl.load(f)
             train_feat = pkl.load(f)
             train_ctx  = pkl.load(f)
-        train = (train_cap, train_feat, train_ctx)
+            train_ctx_raw = pkl.load(f)
+        train = (train_cap, train_feat, train_ctx, train_ctx_raw)
     if load_test:
         with open(path+'coco_align.test.pkl', 'rb') as f:
             test_cap  = pkl.load(f)
             test_feat = pkl.load(f)
             test_ctx  = pkl.load(f)
-        test = (test_cap, test_feat, test_ctx)
+            test_ctx_raw = pkl.load(f)
+        test = (test_cap, test_feat, test_ctx, test_ctx_raw)
     if load_dev:
         with open(path+'coco_align.dev.pkl', 'rb') as f:
             dev_cap  = pkl.load(f)
             dev_feat = pkl.load(f)
             dev_ctx  = pkl.load(f)
-        valid = (dev_cap, dev_feat, dev_ctx)
+            dev_ctx_raw = pkl.load(f)
+        valid = (dev_cap, dev_feat, dev_ctx, dev_ctx_raw)
 
     with open(path+'dictionary.pkl', 'rb') as f:
         worddict = pkl.load(f)
