@@ -941,7 +941,7 @@ def gen_sample(tparams, f_init, f_next, ctx0, options,
             # get the corresponding hypothesis and append the predicted word
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
                 new_hyp_samples.append(hyp_samples[ti]+[wi])
-                new_hyp_scores[idx] = copy.copy(costs[ti]) # copy in the cost of that hypothesis 
+                new_hyp_scores[idx] = copy.copy(costs[idx]) # copy in the cost of that hypothesis 
                 for lidx in xrange(options['n_layers_lstm']):
                     new_hyp_states[lidx].append(copy.copy(next_state[lidx][ti]))
                 for lidx in xrange(options['n_layers_lstm']):
@@ -964,7 +964,7 @@ def gen_sample(tparams, f_init, f_next, ctx0, options,
                     sample_score.append(new_hyp_scores[idx])
                     dead_k += 1 # completed sample!
                 else:
-                    new_live_k += 1 # collect collect correct states/memories
+                    new_live_k += 1 # collect correct states/memories
                     hyp_samples.append(new_hyp_samples[idx])
                     hyp_scores.append(new_hyp_scores[idx])
                     for lidx in xrange(options['n_layers_lstm']):
