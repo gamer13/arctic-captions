@@ -4,6 +4,8 @@ import sys
 # Status monitor
 from monitor import Monitor
 
+from IPython import embed
+
 def main(args):
     monitor = Monitor('{}/{}_status.json'.format(args['out_dir'].rstrip('/'), args["model"]))
 
@@ -15,7 +17,7 @@ def main(args):
                                    data_dir=args['data_dir'].rstrip('/'),
                                    saveto=args["model"],
                                    attn_type='deterministic',
-                                   reload_=False,
+                                   reload_=args['reload'],
                                    dim_word=512,
                                    ctx_dim=512,
                                    dim=1800,
@@ -53,7 +55,7 @@ def main(args):
                                    data_dir=args['data_dir'].rstrip('/'),
                                    saveto=args["model"],
                                    attn_type='deterministic',
-                                   reload_=False,
+                                   reload_=args['reload'],
                                    dim_word=512,
                                    ctx_dim=512,
                                    tex_dim=512,
@@ -94,7 +96,7 @@ def main(args):
                                    data_dir=args['data_dir'].rstrip('/'),
                                    saveto=args["model"],
                                    attn_type='deterministic',
-                                   reload_=False,
+                                   reload_=args['reload'],
                                    dim_word=512,
                                    ctx_dim=512,
                                    tex_dim=512,
@@ -143,5 +145,6 @@ if __name__ == '__main__':
     parser.add_argument('model', help='model filename (*.npz)')
     parser.add_argument("--attn_type",  default="deterministic", help="type of attention mechanism", choices=['deterministic', 'stochastic'])
     parser.add_argument('--type', default='normal', choices=['normal', 't_attn', 't_static'])
+    parser.add_argument('--reload', '-r', help='reload model', action='store_true')
     args = parser.parse_args()
     main(vars(args))
