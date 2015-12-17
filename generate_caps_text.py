@@ -8,6 +8,7 @@ import numpy
 import cPickle as pkl
 import json
 from progress.bar import Bar
+import scipy.sparse
 
 from capgen_text import build_sampler, gen_sample, \
                    load_params, \
@@ -77,16 +78,20 @@ def main(model, saveto, path='./', k=1, normalize=False, zero_pad=False, dataset
 
     # unsparsify, reshape, and queue
     def _send_job(context, text):
+        textdim = text.todense().shape[1] / 512
         cc = context.todense().reshape([14*14,512])
-        tt = text.todense().reshape([100, 512])
+        if scipy.sparse.issparse(text):
+            tt = text.todense().reshape([textdim, 512])
+        else:
+            tt = text.reshape([textdim, 512])
         if zero_pad:
             cc0 = numpy.zeros((cc.shape[0]+1, cc.shape[1])).astype('float32')
             cc0[:-1,:] = cc
             tt0 = numpy.zeros((tt.shape[0]+1, tt.shape[1])).astype('float32')
-            tt0[:-1,:] = tt
+            tt0[:-1,:] = tt.astype(numpy.float32)
         else:
             cc0 = cc
-            tt0 = tt
+            tt0 = tt.astype(numpy.float32)
         return create_sample(tparams, f_init, f_next, cc0, tt0, options, trng, k, normalize)
 
     ds = datasets.strip().split(',')
@@ -108,7 +113,7 @@ def main(model, saveto, path='./', k=1, normalize=False, zero_pad=False, dataset
                 print >>f, '\n'.join(caps)
             print 'Done'
         if dd == 'test':
-            print 'Test Set...',
+            bar = Bar('Test Set...', max=len(test[1]))
             caps = []
             for i in range(len(test[1])):
                 sample = _send_job(test[1][i], test[2][i])
