@@ -591,9 +591,9 @@ def init_params(options):
         ctx_dim = options['dim'] * 2
     if options['lstm_encoder_context']:
         params = get_layer('lstm')[0](options, params, prefix='encoder_tex',
-                                      nin=options['tex_dim'], dim=options['ctx_dim'])
+                                      nin=options['tex_dim'], dim=options['ctx_dim'] / 2) 
         params = get_layer('lstm')[0](options, params, prefix='encoder_tex_rev',
-                                      nin=options['tex_dim'], dim=options['ctx_dim'])
+                                      nin=options['tex_dim'], dim=options['ctx_dim'] / 2)
         tex_dim = options['ctx_dim']
     # init_state, init_cell: [top right on page 4]
     for lidx in xrange(1, options['n_layers_init']):
@@ -695,7 +695,7 @@ def build_model(tparams, options, sampling=True):
                                        options, prefix='encoder_tex')[0].dimshuffle(1,0,2)
         tex_rev = get_layer('lstm')[1](tparams, tex.dimshuffle(1,0,2)[:,::-1,:],
                                        options, prefix='encoder_tex_rev')[0][:,::-1,:].dimshuffle(1,0,2)
-        tex0 = tensor.sum((tex_fwd, tex_rev), axis=2) # TODO: Check axis
+        tex0 = tensor.concatenate((tex_fwd, tex_rev), axis=2)
     else:
         tex0 = tex
 
@@ -819,21 +819,24 @@ def build_sampler(tparams, options, use_noise, trng, sampling=True):
     ctx = tensor.matrix('ctx_sampler', dtype='float32')
     tex = tensor.matrix('tex_sampler', dtype='float32')
     if options['lstm_encoder']:
-        # encoder
         ctx_fwd = get_layer('lstm')[1](tparams, ctx,
                                        options, prefix='encoder')[0]
         ctx_rev = get_layer('lstm')[1](tparams, ctx[::-1,:],
                                        options, prefix='encoder_rev')[0][::-1,:]
-        ctx = tensor.concatenate((ctx_fwd, ctx_rev), axis=1)
+        ctx0 = tensor.concatenate((ctx_fwd, ctx_rev), axis=1)
+    else:
+        ctx0 = ctx
     if options['lstm_encoder_context']:
         tex_fwd = get_layer('lstm')[1](tparams, tex,
                                        options, prefix='encoder_tex')[0]
         tex_rev = get_layer('lstm')[1](tparams, tex[::-1,:],
                                        options, prefix='encoder_tex_rev')[0][::-1,:]
-        tex = tensor.concatenate((tex_fwd, tex_rev), axis=1) # TODO: Check axis!
+        tex0 = tensor.concatenate((tex_fwd, tex_rev), axis=1)
+    else:
+        tex0 = tex
 
     # initial state/cell
-    mean = ctx.mean(0) + tex.mean(0)
+    mean = ctx0.mean(0) + tex0.mean(0)
     for lidx in xrange(1, options['n_layers_init']):
         mean = get_layer('ff')[1](tparams, mean, options,
                                       prefix='ff_init_%d'%lidx, activ='rectifier')
@@ -847,12 +850,29 @@ def build_sampler(tparams, options, use_noise, trng, sampling=True):
             init_memory.append(get_layer('ff')[1](tparams, mean, options, prefix='ff_memory_%d'%lidx, activ='tanh'))
 
     print 'Building f_init...',
-    f_init = theano.function([ctx, tex], [ctx, tex]+init_state+init_memory, name='f_init', profile=False)
+    f_init = theano.function([ctx, tex], [ctx0, tex0]+init_state+init_memory, name='f_init', profile=False)
     print 'Done'
 
     # build f_next
     ctx = tensor.matrix('ctx_sampler', dtype='float32')
     tex = tensor.matrix('tex_sampler', dtype='float32')
+    if options['lstm_encoder']:
+        ctx_fwd = get_layer('lstm')[1](tparams, ctx,
+                                       options, prefix='encoder')[0]
+        ctx_rev = get_layer('lstm')[1](tparams, ctx[::-1,:],
+                                       options, prefix='encoder_rev')[0][::-1,:]
+        ctx0 = tensor.concatenate((ctx_fwd, ctx_rev), axis=1)
+    else:
+        ctx0 = ctx
+    if options['lstm_encoder_context']:
+        tex_fwd = get_layer('lstm')[1](tparams, tex,
+                                       options, prefix='encoder_tex')[0]
+        tex_rev = get_layer('lstm')[1](tparams, tex[::-1,:],
+                                       options, prefix='encoder_tex_rev')[0][::-1,:]
+        tex0 = tensor.concatenate((tex_fwd, tex_rev), axis=1)
+    else:
+        tex0 = tex
+
     x = tensor.vector('x_sampler', dtype='int64')
     init_state = [tensor.matrix('init_state', dtype='float32')]
     init_memory = [tensor.matrix('init_memory', dtype='float32')]
@@ -867,8 +887,8 @@ def build_sampler(tparams, options, use_noise, trng, sampling=True):
 
     proj = get_layer('lstm_cond')[1](tparams, emb, options,
                                      prefix='decoder',
-                                     mask=None, context=ctx,
-                                     text=tex,
+                                     mask=None, context=ctx0,
+                                     text=tex0,
                                      one_step=True,
                                      init_state=init_state[0],
                                      init_memory=init_memory[0],
@@ -882,8 +902,8 @@ def build_sampler(tparams, options, use_noise, trng, sampling=True):
         for lidx in xrange(1, options['n_layers_lstm']):
             proj = get_layer('lstm_cond')[1](tparams, proj_h, options,
                                              prefix='decoder_%d'%lidx,
-                                             context=ctx,
-                                             text=tex,
+                                             context=ctx0,
+                                             text=tex0,
                                              one_step=True,
                                              init_state=init_state[lidx],
                                              init_memory=init_memory[lidx],
@@ -1130,7 +1150,8 @@ def pred_probs(f_log_probs, options, worddict, prepare_data, data, iterator, ver
                                      data[2],
                                      worddict,
                                      maxlen=None,
-                                     n_words=options['n_words'])
+                                     n_words=options['n_words'],
+                                     tex_dim=options['tex_dim'])
         pred_probs = f_log_probs(x,mask,ctx,tex)
         probs[valid_index] = pred_probs[:,None]
 
@@ -1387,12 +1408,13 @@ def train(dim_word=100,  # word vector dimensionality
                 # preprocess the caption, recording the
                 # time spent to help detect bottlenecks
                 pd_start = time.time()
-                x, mask, ctx, tex, raw = prepare_data(caps,     # Captions of this batch
+                x, mask, ctx, tex = prepare_data(caps,     # Captions of this batch
                                             train[1], # Pass in visual features
                                             train[2],
                                             worddict, # Word dictionary
                                             maxlen=maxlen,
-                                            n_words=n_words)
+                                            n_words=n_words,
+                                            tex_dim=model_options['tex_dim'])
                 pd_duration = time.time() - pd_start
 
                 if x is None:
@@ -1538,7 +1560,6 @@ def train(dim_word=100,  # word vector dimensionality
             zipp(best_p, tparams)
     except:
         logging.exception("Error:")
-        embed()
         raise
 
     use_noise.set_value(0.)
