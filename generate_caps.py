@@ -31,7 +31,7 @@ def create_sample(tparams, f_init, f_next, context, options, trng, k, normalize)
     sidx = numpy.argmin(score)
     return sample[sidx]
 
-def main(model, saveto, k=1, normalize=False, zero_pad=False, datasets='dev,test', sampling=False, pkl_name=None):
+def main(model, saveto, k=1, normalize=False, zero_pad=False, datasets='dev,test', data_path='./', sampling=False, pkl_name=None):
     # load model model_options
     if pkl_name is None:
         pkl_name = model
@@ -41,7 +41,7 @@ def main(model, saveto, k=1, normalize=False, zero_pad=False, datasets='dev,test
     # fetch data, skip ones we aren't using to save time
     load_data, prepare_data = get_dataset(options['dataset'])
     _, valid, test, worddict = load_data(load_train=False, load_dev=True if 'dev' in datasets else False,
-                                             load_test=True if 'test' in datasets else False)
+                                             load_test=True if 'test' in datasets else False, path=data_path)
 
     # <eos> means end of sequence (aka periods), UNK means unknown
     word_idict = dict()
@@ -123,10 +123,11 @@ if __name__ == "__main__":
     parser.add_argument('-sampling', action="store_true", default=False) # this only matters for hard attention
     parser.add_argument('-n', action="store_true", default=False)
     parser.add_argument('-z', action="store_true", default=False)
-    parser.add_argument('-d', type=str, default='devt')
+    parser.add_argument('-d', type=str, default='dev')
     parser.add_argument('-pkl_name', type=str, default=None, help="name of pickle file (without the .pkl)")
+    parser.add_argument('data', type=str)
     parser.add_argument('model', type=str)
     parser.add_argument('saveto', type=str)
 
     args = parser.parse_args()
-    main(args.model, args.saveto, k=args.k, zero_pad=args.z, pkl_name=args.pkl_name, normalize=args.n, datasets=args.d, sampling=args.sampling)
+    main(args.model, args.saveto, k=args.k, zero_pad=args.z, pkl_name=args.pkl_name, data_path=args.data, normalize=args.n, datasets=args.d, sampling=args.sampling)
