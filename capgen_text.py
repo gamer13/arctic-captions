@@ -850,7 +850,7 @@ def build_sampler(tparams, options, use_noise, trng, sampling=True):
             init_memory.append(get_layer('ff')[1](tparams, mean, options, prefix='ff_memory_%d'%lidx, activ='tanh'))
 
     print 'Building f_init...',
-    f_init = theano.function([ctx, tex], [ctx0, tex0]+init_state+init_memory, name='f_init', profile=False)
+    f_init = theano.function([ctx, tex], [ctx, tex]+init_state+init_memory, name='f_init', profile=False)
     print 'Done'
 
     # build f_next
