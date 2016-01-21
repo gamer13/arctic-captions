@@ -1094,6 +1094,7 @@ def train(dim_word=100,  # word vector dimensionality
           valid_batch_size = 16,
           saveto='model.npz',  # relative path of saved model file
           out_dir='',
+          data_dir='',
           validFreq=1000,
           saveFreq=1000,  # save the parameters after every saveFreq updates
           sampleFreq=100,  # generate some samples after every sampleFreq updates
@@ -1123,7 +1124,7 @@ def train(dim_word=100,  # word vector dimensionality
     monitor.status = 2
     # ----------------
     load_data, prepare_data = get_dataset(dataset)
-    train, valid, test, worddict = load_data()
+    train, valid, test, worddict = load_data(path=data_dir)
 
     # index 0 and 1 always code for the end of sentence and unknown token
     word_idict = dict()
