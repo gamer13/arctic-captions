@@ -103,22 +103,19 @@ def load_data(load_train=True, load_dev=True, load_test=True, path='./'):
             train_cap  = pkl.load(f)
             train_feat = pkl.load(f)
             train_ctx  = pkl.load(f)
-            #train_ctx_raw = pkl.load(f)
-        train = (train_cap, train_feat, train_ctx)#, train_ctx_raw)
+        train = (train_cap, train_feat, train_ctx)
     if load_test:
         with open(path+'/coco_align.test.pkl', 'rb') as f:
             test_cap  = pkl.load(f)
             test_feat = pkl.load(f)
             test_ctx  = pkl.load(f)
-            #test_ctx_raw = pkl.load(f)
-        test = (test_cap, test_feat, test_ctx)#, test_ctx_raw)
+        test = (test_cap, test_feat, test_ctx)
     if load_dev:
         with open(path+'/coco_align.dev.pkl', 'rb') as f:
             dev_cap  = pkl.load(f)
             dev_feat = pkl.load(f)
             dev_ctx  = pkl.load(f)
-            #dev_ctx_raw = pkl.load(f)
-        valid = (dev_cap, dev_feat, dev_ctx)#, dev_ctx_raw)
+        valid = (dev_cap, dev_feat, dev_ctx)
 
     with open(path+'/dictionary.pkl', 'rb') as f:
         worddict = pkl.load(f)
