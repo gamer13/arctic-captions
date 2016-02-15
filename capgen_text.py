@@ -1257,6 +1257,9 @@ def train(dim_word=100,  # word vector dimensionality
     word_idict[0] = '<eos>'
     word_idict[1] = 'UNK'
 
+    # Save word dictionary in model options for portability
+    model_options['dictionary'] = word_idict
+
     # Initialize (or reload) the parameters using 'model_options'
     # then build the Theano graph
     print 'Building model'
