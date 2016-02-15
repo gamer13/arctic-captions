@@ -78,11 +78,12 @@ def main(model, saveto, path='./', k=1, normalize=False, zero_pad=False, dataset
 
     # unsparsify, reshape, and queue
     def _send_job(context, text):
-        textdim = text.todense().shape[1] / 512
         cc = context.todense().reshape([14*14,512])
         if scipy.sparse.issparse(text):
+            textdim = text.todense().shape[1] / 512
             tt = text.todense().reshape([textdim, 512])
         else:
+            textdim = text.shape[1] / 512
             tt = text.reshape([textdim, 512])
         if zero_pad:
             cc0 = numpy.zeros((cc.shape[0]+1, cc.shape[1])).astype('float32')
